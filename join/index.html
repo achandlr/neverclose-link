@@ -97,7 +97,9 @@
       function invalidState() {
         headline.textContent = 'This invite has already been used';
         status.textContent = 'Or it may have expired. Ask your friend to send a fresh link. You can still grab the app below.';
-        hide(openBtn); show(steps); foot.textContent = '';
+        // Keep the steps card hidden here: its last step says "tap Open my invite",
+        // a button this state removes.
+        hide(openBtn); hide(steps); foot.textContent = '';
       }
 
       function missingState() {
@@ -108,8 +110,14 @@
 
       // Best effort: keep the invite URL on their clipboard so it survives the
       // TestFlight detour even if they lose this tab. Gesture-initiated, so allowed.
+      // writeText returns a promise: attach a rejection handler (a denied clipboard
+      // permission must not surface as an unhandled rejection), and keep the sync
+      // try/catch for environments where the API itself is missing or throws.
       getBtn.addEventListener('click', function () {
-        try { navigator.clipboard && navigator.clipboard.writeText(location.href); } catch (e) {}
+        try {
+          var w = navigator.clipboard && navigator.clipboard.writeText(location.href);
+          if (w && w.catch) w.catch(function () {});
+        } catch (e) {}
       });
 
       if (!code) { missingState(); return; }
@@ -123,7 +131,14 @@
         headers: { 'content-type': 'application/json', apikey: ANON_KEY, authorization: 'Bearer ' + ANON_KEY },
         body: JSON.stringify({ invite_code: code })
       })
-        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (r) {
+          // 4xx means the code itself is bad (e.g. truncated: PostgREST rejects a
+          // malformed uuid with 400), so show the invalid state rather than a generic
+          // page whose Open button carries a broken code. 5xx/network stay generic:
+          // the invite may be fine and the app can still resolve it.
+          if (r.ok) return r.json();
+          return r.status >= 400 && r.status < 500 ? [] : null;
+        })
         .then(function (rows) {
           clearTimeout(timer);
           if (rows === null) { readyState(null); return; }
