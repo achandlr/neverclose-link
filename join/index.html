@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>You're invited to Never Close</title>
+<meta property="og:title" content="You're invited to Never Close" />
+<meta property="og:description" content="A running tab between two people. It never needs settling, it just evens out." />
+<meta property="og:type" content="website" />
+<meta name="description" content="Open your invite to start a shared tab on Never Close." />
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0d0e10; color: #ECE7DE;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    padding: 24px; text-align: center;
+  }
+  .card { max-width: 360px; width: 100%; }
+  .mark { font-family: Georgia, "Times New Roman", serif; font-size: 30px; letter-spacing: .5px; margin-bottom: 6px; }
+  .mark b { color: #C9A24B; font-weight: 600; }
+  .tag { color: #8B8578; font-size: 14px; margin-bottom: 30px; }
+  h1 { font-family: Georgia, "Times New Roman", serif; font-size: 22px; font-weight: 600; line-height: 1.35; margin-bottom: 10px; }
+  .status { color: #B7B1A4; font-size: 14.5px; line-height: 1.5; margin-bottom: 26px; min-height: 20px; }
+  .btn {
+    display: block; width: 100%; padding: 15px 18px; border-radius: 14px;
+    background: #C9A24B; color: #17130A; text-decoration: none;
+    font-weight: 600; font-size: 15.5px; margin-bottom: 12px;
+  }
+  .btn.secondary { background: transparent; color: #C9A24B; border: 1px solid #33302B; }
+  .steps {
+    text-align: left; background: #141518; border: 1px solid #26272B; border-radius: 14px;
+    padding: 14px 16px; margin-top: 10px;
+  }
+  .steps .t { color: #B7B1A4; font-size: 12px; letter-spacing: .8px; text-transform: uppercase; margin-bottom: 8px; }
+  .steps ol { padding-left: 18px; color: #B7B1A4; font-size: 13.5px; line-height: 1.65; }
+  .foot { color: #6E6A60; font-size: 12px; margin-top: 20px; line-height: 1.5; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="mark">Never <b>Close</b></div>
+    <div class="tag">The tab never closes. It just evens out.</div>
+
+    <h1 id="headline">Checking your invite&hellip;</h1>
+    <div class="status" id="status"></div>
+
+    <a class="btn hidden" id="openBtn" href="#">Open my invite</a>
+    <a class="btn secondary" id="getBtn" href="https://testflight.apple.com/join/PjU2BPMB">Get the app (free)</a>
+
+    <div class="steps hidden" id="steps">
+      <div class="t">New here? Two minutes:</div>
+      <ol>
+        <li>Tap <strong>Get the app</strong> and install Never Close from TestFlight.</li>
+        <li>Open it and sign in with Apple or Google.</li>
+        <li>Come back to this page (it stays in your chat) and tap <strong>Open my invite</strong>.</li>
+      </ol>
+    </div>
+
+    <div class="foot" id="foot">Already have Never Close? Just tap Open my invite.</div>
+    <noscript><div class="foot">Enable JavaScript, or install the app via the button above and re-open this link.</div></noscript>
+  </div>
+
+  <script>
+    (function () {
+      var SUPABASE_URL = 'https://kctdxvhhwzyamrcmfqyb.supabase.co';
+      var ANON_KEY = 'sb_publishable_5-xrV0WqfUZlHFTf7bcwvQ_hrrFR-_g';
+
+      var params = new URLSearchParams(location.search);
+      var raw = params.get('c') || params.get('code') || '';
+      // Codes are UUIDs from create_invite_link; strip anything else before use.
+      var code = raw.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 128);
+
+      var headline = document.getElementById('headline');
+      var status = document.getElementById('status');
+      var openBtn = document.getElementById('openBtn');
+      var getBtn = document.getElementById('getBtn');
+      var steps = document.getElementById('steps');
+      var foot = document.getElementById('foot');
+
+      function show(el) { el.classList.remove('hidden'); }
+      function hide(el) { el.classList.add('hidden'); }
+
+      function readyState(inviterName) {
+        // textContent only: never inject the RPC result as HTML.
+        headline.textContent = inviterName
+          ? inviterName + ' invited you to a shared tab'
+          : 'You’re invited to a shared tab';
+        status.textContent = 'One tab for the two of you. Add what you each pay for, and it evens out over time.';
+        openBtn.setAttribute('href', 'neverclose://join/' + code);
+        show(openBtn); show(steps);
+      }
+
+      function invalidState() {
+        headline.textContent = 'This invite has already been used';
+        status.textContent = 'Or it may have expired. Ask your friend to send a fresh link. You can still grab the app below.';
+        hide(openBtn); show(steps); foot.textContent = '';
+      }
+
+      function missingState() {
+        headline.textContent = 'This link is incomplete';
+        status.textContent = 'It looks like the invite code is missing. Ask your friend to share the link again.';
+        hide(openBtn); foot.textContent = '';
+      }
+
+      // Best effort: keep the invite URL on their clipboard so it survives the
+      // TestFlight detour even if they lose this tab. Gesture-initiated, so allowed.
+      getBtn.addEventListener('click', function () {
+        try { navigator.clipboard && navigator.clipboard.writeText(location.href); } catch (e) {}
+      });
+
+      if (!code) { missingState(); return; }
+
+      // Personalize from the invite itself (get_invite_preview is anon-callable and
+      // only exposes the inviter's display name for a secret UUID code). Any network
+      // or server failure falls back to a generic, fully functional page.
+      var timer = setTimeout(function () { readyState(null); }, 2500);
+      fetch(SUPABASE_URL + '/rest/v1/rpc/get_invite_preview', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', apikey: ANON_KEY, authorization: 'Bearer ' + ANON_KEY },
+        body: JSON.stringify({ invite_code: code })
+      })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (rows) {
+          clearTimeout(timer);
+          if (rows === null) { readyState(null); return; }
+          var name = rows && rows[0] && rows[0].inviter_name;
+          if (name) readyState(String(name));
+          else invalidState();
+        })
+        .catch(function () { clearTimeout(timer); readyState(null); });
+    })();
+  </script>
+</body>
+</html>
