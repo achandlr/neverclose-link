@@ -146,13 +146,12 @@
           return r.status >= 400 && r.status < 500 ? [] : null;
         })
         .then(function (rows) {
-          clearTimeout(timer);
           if (rows === null) { readyState(null); return; }
           var name = rows && rows[0] && rows[0].inviter_name;
           if (name) readyState(String(name));
           else invalidState();
         })
-        .catch(function () { clearTimeout(timer); readyState(null); });
+        .catch(function () { readyState(null); });
     })();
   </script>
 </body>
