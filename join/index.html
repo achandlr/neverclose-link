@@ -94,6 +94,13 @@
         show(openBtn); show(steps);
       }
 
+      // The Open button must be usable INSTANTLY: it needs only the code, which is
+      // already in the URL. Only the inviter's NAME needs the network, so render the
+      // full working page now and let the lookup upgrade the headline (or flip to the
+      // invalid state) when it lands. Testers read a late-appearing primary button as
+      // broken (reported 2026-07-16).
+      if (code) readyState(null);
+
       function invalidState() {
         headline.textContent = 'This invite has already been used';
         status.textContent = 'Or it may have expired. Ask your friend to send a fresh link. You can still grab the app below.';
@@ -124,8 +131,7 @@
 
       // Personalize from the invite itself (get_invite_preview is anon-callable and
       // only exposes the inviter's display name for a secret UUID code). Any network
-      // or server failure falls back to a generic, fully functional page.
-      var timer = setTimeout(function () { readyState(null); }, 2500);
+      // or server failure leaves the generic, fully functional page already rendered.
       fetch(SUPABASE_URL + '/rest/v1/rpc/get_invite_preview', {
         method: 'POST',
         headers: { 'content-type': 'application/json', apikey: ANON_KEY, authorization: 'Bearer ' + ANON_KEY },
