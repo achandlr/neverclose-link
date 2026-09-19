@@ -134,6 +134,13 @@
 
       if (!code) { missingState(); return; }
 
+      // Never Close ships for iPhone only. On any other device the buttons above cannot work
+      // (TestFlight and the neverclose:// scheme are iOS), so say so instead of offering them.
+      if (!/iPhone|iPad|iPod/.test(navigator.userAgent)) {
+        hide(openBtn); hide(getBtn); hide(steps);
+        foot.textContent = 'Never Close is an iPhone app for now. Open this link on your iPhone to join.';
+      }
+
       // Personalize from the invite itself (get_invite_preview is anon-callable and
       // only exposes the inviter's display name for a secret UUID code). Any network
       // or server failure leaves the generic, fully functional page already rendered.
