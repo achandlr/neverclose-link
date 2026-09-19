@@ -84,12 +84,17 @@
       function show(el) { el.classList.remove('hidden'); }
       function hide(el) { el.classList.add('hidden'); }
 
-      function readyState(inviterName) {
-        // textContent only: never inject the RPC result as HTML.
-        headline.textContent = inviterName
-          ? inviterName + ' invited you to a shared tab'
-          : 'You’re invited to a shared tab';
-        status.textContent = 'One tab for the two of you. Add what you each pay for, and it evens out over time.';
+      function readyState(inviterName, groupName) {
+        // textContent only: never inject the RPC result as HTML. A GROUP link (the preview carries
+        // the group's name) names the group; a pair link keeps the two-person wording.
+        headline.textContent = groupName
+          ? (inviterName || 'A friend') + ' invited you to ' + groupName
+          : inviterName
+            ? inviterName + ' invited you to a shared tab'
+            : 'You’re invited to a shared tab';
+        status.textContent = groupName
+          ? 'One running tab for the whole group. Anyone can log what they paid, and it keeps who owes whom straight.'
+          : 'One tab for the two of you. Add what you each pay for, and it evens out over time.';
         openBtn.setAttribute('href', 'neverclose://join/' + code);
         show(openBtn); show(steps);
       }
@@ -148,7 +153,8 @@
         .then(function (rows) {
           if (rows === null) { readyState(null); return; }
           var name = rows && rows[0] && rows[0].inviter_name;
-          if (name) readyState(String(name));
+          var group = rows && rows[0] && rows[0].group_name;
+          if (name) readyState(String(name), group ? String(group) : null);
           else invalidState();
         })
         .catch(function () { readyState(null); });
