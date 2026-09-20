@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
+    <meta name="robots" content="noindex" />
 <link rel="icon" href="data:," />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>You're invited to Never Close</title>
@@ -96,7 +97,9 @@
           ? 'One running tab for the whole group. Anyone can log what they paid, and it keeps who owes whom straight.'
           : 'One tab for the two of you. Add what you each pay for, and it evens out over time.';
         openBtn.setAttribute('href', 'neverclose://join/' + code);
-        show(openBtn); show(steps);
+        // Not on other devices: the late name lookup used to bring the dead Open button and the
+        // steps card back on Android and Mac (2026-09-20).
+        if (onIphone) { show(openBtn); show(steps); }
       }
 
       // The Open button must be usable INSTANTLY: it needs only the code, which is
@@ -104,11 +107,19 @@
       // full working page now and let the lookup upgrade the headline (or flip to the
       // invalid state) when it lands. Testers read a late-appearing primary button as
       // broken (reported 2026-07-16).
+      // Never Close ships for iPhone only. On any other device the buttons above cannot work
+      // (TestFlight and the neverclose:// scheme are iOS), so say so instead of offering them.
+      var onIphone = /iPhone|iPad|iPod/.test(navigator.userAgent);
+      if (!onIphone) {
+        hide(openBtn); hide(getBtn); hide(steps);
+        foot.textContent = 'Never Close is an iPhone app for now. Open this link on your iPhone to join.';
+      }
+
       if (code) readyState(null);
 
       function invalidState() {
         headline.textContent = 'This invite has already been used';
-        status.textContent = 'Or it may have expired. Ask your friend to send a fresh link. You can still grab the app below.';
+        status.textContent = 'Ask your friend to send a fresh link. You can still grab the app below.';
         // Keep the steps card hidden here: its last step says "tap Open my invite",
         // a button this state removes.
         hide(openBtn); hide(steps); foot.textContent = '';
@@ -134,12 +145,6 @@
 
       if (!code) { missingState(); return; }
 
-      // Never Close ships for iPhone only. On any other device the buttons above cannot work
-      // (TestFlight and the neverclose:// scheme are iOS), so say so instead of offering them.
-      if (!/iPhone|iPad|iPod/.test(navigator.userAgent)) {
-        hide(openBtn); hide(getBtn); hide(steps);
-        foot.textContent = 'Never Close is an iPhone app for now. Open this link on your iPhone to join.';
-      }
 
       // Personalize from the invite itself (get_invite_preview is anon-callable and
       // only exposes the inviter's display name for a secret UUID code). Any network
@@ -150,12 +155,13 @@
         body: JSON.stringify({ invite_code: code })
       })
         .then(function (r) {
-          // 4xx means the code itself is bad (e.g. truncated: PostgREST rejects a
-          // malformed uuid with 400), so show the invalid state rather than a generic
-          // page whose Open button carries a broken code. 5xx/network stay generic:
-          // the invite may be fine and the app can still resolve it.
+          // 400 means the code itself is bad (PostgREST rejects a malformed uuid with 400), so
+          // show the invalid state rather than a page whose Open button carries a broken code.
+          // Everything else (a rotated key: 401; a schema-cache miss after a migration: 404; a
+          // rate limit: 429; 5xx; no network) keeps the working page: the invite may be fine and
+          // the app can still resolve it. Every 4xx used to read "already been used" (2026-09-20).
           if (r.ok) return r.json();
-          return r.status >= 400 && r.status < 500 ? [] : null;
+          return r.status === 400 ? [] : null;
         })
         .then(function (rows) {
           if (rows === null) { readyState(null); return; }
